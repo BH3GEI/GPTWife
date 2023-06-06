@@ -1,6 +1,9 @@
 import tkinter as tk
 import sqlite3
 import cv2
+import numpy as np
+from keras.models import load_model
+from tensorflow.keras.utils import img_to_array
 import datetime
 import os
 from PIL import Image, ImageTk
@@ -16,6 +19,12 @@ face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 # 创建一个人脸识别器对象
 face_recognizer = cv2.face.LBPHFaceRecognizer_create()
+
+# 加载模型
+emotion_classifier = load_model('emotionModel1.hdf5')
+
+# 表情标签
+emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 
 
 # 读取人脸照片和学号，建议传入faces
@@ -55,7 +64,7 @@ def read_images_and_labels(path):
 
 
 # 定义一个函数来显示预测结果
-def draw_predict(frame, label, x, y, w, h):
+def draw_predict(frame,emotion, label, x, y, w, h):
     # 在图像上绘制矩形
     color = (0, 255, 0)  # 矩形的颜色，这里使用绿色
     thickness = 2  # 矩形的线条粗细，这里设为 2
@@ -64,7 +73,7 @@ def draw_predict(frame, label, x, y, w, h):
     cv2.rectangle(frame, pt1, pt2, color, thickness)  # 在图像上绘制矩形
     # 在图像上绘制标签
     cv2.putText(frame, str(label), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
+    cv2.putText(frame, emotion, (x+30, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
 
 # 读取已有的人脸照片和学号
@@ -324,7 +333,15 @@ def update_img():
     ret, frame = cap.read()
     # 转换为灰度图像
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    # # 检测人脸位置
+    # 调整图像大小以匹配模型的输入大小
+    resized_image = cv2.resize(gray, (64, 64))
+    # 将图像转换为模型所需的数组格式
+    image_array = img_to_array(resized_image)
+    image_array = np.expand_dims(image_array, axis=0)
+    # 使用模型进行预测
+    predictions = emotion_classifier.predict(image_array)
+    emotion = emotions[np.argmax(predictions)]
+    # 检测人脸位置
     faces = face_detector.detectMultiScale(gray, 1.3, 5)
     # 遍历每个人脸
     for (x, y, w, h) in faces:
@@ -333,7 +350,7 @@ def update_img():
         # 预测人脸的标签
         label, confidence = face_recognizer.predict(face)
         # 显示预测结果
-        draw_predict(frame, label, x, y, w, h)
+        draw_predict(frame,emotion ,label, x, y, w, h)
         #print(label,confidence,x,y,w,h)
     # 显示图像
     #cv2.imshow('Video', frame)
