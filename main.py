@@ -1,6 +1,8 @@
 import tkinter as tk
 import sqlite3
 import cv2
+import sys
+from keras.models import load_model
 import numpy as np
 from keras.models import load_model
 from tensorflow.keras.utils import img_to_array
@@ -21,11 +23,10 @@ face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 face_recognizer = cv2.face.LBPHFaceRecognizer_create()
 
 # 加载模型
-emotion_classifier = load_model('emotionModel1.hdf5')
+emotion_classifier = load_model('emotionModel0.hdf5')
 
 # 表情标签
-emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
-
+emotions = ['happy', 'disgust', 'neutral', 'angry', 'sad', 'surprise', 'fear']
 
 # 读取人脸照片和学号，建议传入faces
 def read_images_and_labels(path):
@@ -333,20 +334,23 @@ def update_img():
     ret, frame = cap.read()
     # 转换为灰度图像
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    # 调整图像大小以匹配模型的输入大小
-    resized_image = cv2.resize(gray, (64, 64))
-    # 将图像转换为模型所需的数组格式
-    image_array = img_to_array(resized_image)
-    image_array = np.expand_dims(image_array, axis=0)
-    # 使用模型进行预测
-    predictions = emotion_classifier.predict(image_array)
-    emotion = emotions[np.argmax(predictions)]
     # 检测人脸位置
     faces = face_detector.detectMultiScale(gray, 1.3, 5)
     # 遍历每个人脸
     for (x, y, w, h) in faces:
         # 裁剪出人脸区域
         face = gray[y:y + h, x:x + w]
+
+        # 调整图像大小以匹配表情模型的输入大小
+        resized_image = cv2.resize(face, (48, 48))
+        # 将图像转换为表情模型所需的数组格式
+        image_array = img_to_array(resized_image)
+        image_array = np.expand_dims(image_array, axis=0)
+        # 使用模型进行表情预测
+        predictions = emotion_classifier.predict(image_array)
+        print(predictions)
+        emotion = emotions[np.argmax(predictions)]
+
         # 预测人脸的标签
         label, confidence = face_recognizer.predict(face)
         # 显示预测结果
