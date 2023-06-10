@@ -15,7 +15,7 @@ from PIL import Image, ImageTk
 import numpy as np
 import time
 
-openai.api_key = "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"
+openai.api_key = "ab"
 
 # 创建数据库连接和游标对象
 conn = sqlite3.connect("student.db")  # 这里可以修改数据库的路径

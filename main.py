@@ -17,7 +17,7 @@ import numpy as np
 import time
 
 
-openai.api_key = "a"
+openai.api_key = "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"
 
 # 创建一个人脸检测器对象
 face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
