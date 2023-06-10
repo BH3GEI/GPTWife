@@ -17,7 +17,7 @@ import numpy as np
 import time
 
 
-openai.api_key = "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"
+openai.api_key = "a"
 
 # 创建一个人脸检测器对象
 face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -36,6 +36,8 @@ proxies = {
     "https": "http://127.0.0.1:9808"
 }
 
+# 设置 requests 库的默认代理
+requests.Session().proxies = proxies
 
 chat_history = []
 
@@ -49,6 +51,7 @@ def ask_gpt3(prompt, chat_history):
                 *chat_history,
             ],
             temperature=0.7,
+            proxies=proxies,
         )
     # 输出响应结果
     # print(response)
