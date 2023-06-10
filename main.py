@@ -51,7 +51,7 @@ def ask_gpt3(prompt, chat_history):
                 *chat_history,
             ],
             temperature=0.7,
-            proxies=proxies,
+            # proxies=proxies,
         )
     # 输出响应结果
     # print(response)
