@@ -4,9 +4,8 @@ import random
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-
-
-emotioncondition = 'sad'
+from PyQt5.QtGui import QMovie
+import facerecognize
 
 
 class DesktopPet(QWidget):
@@ -14,24 +13,25 @@ class DesktopPet(QWidget):
         super(DesktopPet, self).__init__(parent)
         # 窗体初始化
         self.movie = None
-        self.condition = None
-        self.walk_condition = None
-        self.talk_condition = None
-        self.emotion_condition = None
-        self.direction = None
+        self.image = None
+        self.screen_width = QDesktopWidget().availableGeometry().width()
+        self.screen_height = QDesktopWidget().availableGeometry().height()
+        self.count = 0
+        self.mouse_pressed = False
+        self.origin_pos = self.pos()
+        self.condition = 0
+        self.walk_condition = 0
+        self.talk_condition = 0
+        self.emotion_condition = 0
+        self.direction = 1
         self.init()
         # 托盘化初始
         self.initPall()
         # 宠物静态gif图加载
         self.initPetImage()
-        # # 宠物正常待机，实现随机切换动作
-        # self.petNormalAction()
-        # 宠物行走
-        self.walkAct()
-#       # 宠物情感
-        self.emotionAct()
-        # 宠物说话
-        self.talkAct()
+        self.pettimer()
+        self.walk_movie = QMovie("emotion/love.gif")
+        self.emotion_movie = QMovie("emotion/love.gif")
 
 # 窗体初始化
     def init(self):
@@ -84,7 +84,7 @@ class DesktopPet(QWidget):
         # 定义显示图片部分
         self.image = QLabel(self)
         # QMovie是一个可以存放动态视频的类，一般是配合QLabel使用的,可以用来存放GIF动态图
-        self.movie = QMovie("normal/right walk.gif")
+        self.movie = QMovie("emotion/love.gif")
         # 设置标签大小
         self.movie.setScaledSize(QSize(200, 200))
         # 将Qmovie在定义的image中显示
@@ -95,10 +95,6 @@ class DesktopPet(QWidget):
         self.randomPosition()
         # 展示
         self.show()
-        # 将宠物正常待机状态的动图放入pet1中
-        self.pet1 = []
-        for i in os.listdir("normal"):
-            self.pet1.append("normal/" + i)
         # 将宠物正常待机状态的对话放入pet2中
         self.dialog = []
         # 读取目录下dialog文件
@@ -107,78 +103,30 @@ class DesktopPet(QWidget):
             # 以\n 即换行符为分隔符，分割放进dialog中
             self.dialog = text.split("\n")
 
-    # # 宠物正常待机动作
-    # def petNormalAction(self):
-    #     # 每隔一段时间做个动作
-    #     # 定时器设置
-    #     self.timer = QTimer()
-    #     # 时间到了自动执行
-    #     self.timer.timeout.connect(self.randomAct)
-    #     # 动作时间切换设置
-    #     self.timer.start(3000)
-    #     # 宠物状态设置为正常
-    #     self.condition = 0
+    def pettimer(self):
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.handleTimeout)
+        self.timer.start(100)  # 每0.1秒执行
+        self.count = 0
 
-    def talkAct(self):
-        # 每隔一段时间切换对话
-        self.talkTimer = QTimer()
-        self.talkTimer.timeout.connect(self.talk)
-        self.talkTimer.start(3000)
-        # 对话状态设置为常态
-        self.talk_condition = 0
-        # 宠物对话框
-        self.talk()
+    def handleTimeout(self):
+        self.count += 1
+        print(self.count)
+        if self.count % 13 == 0:  # 每0.3秒执行
+            print("walk")
+            self.walk()
 
-    def walkAct(self):
-        # 左右走
-        self.walktimer = QTimer()
-        # 时间到了自动执行
-        self.walktimer.timeout.connect(self.walk)
-        # 动作时间切换设置
-        self.walktimer.start(3000)
-        # 行走状态设置为常态
-        self.walk_condition = 0
-        # 宠物行走
-        self.walk()
+        if self.count % 13 == 0:  # 每0.4秒执行
+            print("talk")
+            self.talk()
 
-    def emotionAct(self):
-        # 情绪检测
-        self.emotionActtimer = QTimer()
-        # 时间到了自动执行
-        self.emotionActtimer.timeout.connect(self.emotion)
-        # 动作时间切换设置
-        self.emotionActtimer.start(3000)
-        # 情绪检测状态设置为常态
-        self.emotion_condition = 1
-        # 检测并显示特殊情感动画
-        self.emotion()
+        if self.count % 40 == 0:  # 每0.5秒执行
+            print("emotion")
+            self.emotion()
 
-    # 随机动作切换
-    # def randomAct(self):
-    #     # condition记录宠物状态，宠物状态为0时，代表正常待机
-    #     if not self.condition:
-    #         # 随机选择装载在pet1里面的gif图进行展示，实现随机切换
-    #         self.movie = QMovie(random.choice(self.pet1))
-    #         # 宠物大小
-    #         self.movie.setScaledSize(QSize(200, 200))
-    #         # 将动画添加到label中
-    #         self.image.setMovie(self.movie)
-    #         # 开始播放动画
-    #         self.movie.start()
-    #     # condition不为0，转为切换特有的动作，实现宠物的点击反馈
-    #     # 这里可以通过else-if语句往下拓展做更多的交互功能
-    #     else:
-    #         # 读取特殊状态图片路径
-    #         self.movie = QMovie("./click/right walk.gif")
-    #         # 宠物大小
-    #         self.movie.setScaledSize(QSize(200, 200))
-    #         # 将动画添加到label中
-    #         self.image.setMovie(self.movie)
-    #         # 开始播放动画
-    #         self.movie.start()
-    #         # 宠物状态设置为正常待机
-    #         self.condition = 0
-    #         self.talk_condition = 0
+        if self.count % 51 == 0:  # 每0.5秒执行
+            print("delay")
+            self.count = 0
 
     # 宠物对话框行为处理
     def talk(self):
@@ -210,94 +158,78 @@ class DesktopPet(QWidget):
             self.talk_condition = 0
 
     def emotion(self):
-        # if self.emotion_condition == 0 and emotioncondition == "neutral":
-        #     # 随机选择装载在pet1里面的gif图进行展示，实现随机切换
-        #     self.movie = QMovie("./emotion/sad.gif")
-        #     # 宠物大小
-        #     self.movie.setScaledSize(QSize(200, 200))
-        #     # 将动画添加到label中
-        #     self.image.setMovie(self.movie)
-        #     # 开始播放动画
-        #     self.movie.start()
+        if self.emotion_condition == 0:
+            self.people_emotion = facerecognize.faceReco(face_detector, emotion_classifier, emotions, face_recognizer)
+            print(self.people_emotion)
+            if self.emotion_condition == 0 and self.people_emotion == 'happy':
+                self.movie = QMovie("./emotion/love.gif")
+                self.movie.setScaledSize(QSize(200, 200))
+                self.image.setMovie(self.movie)
+                self.movie.start()
+                print("happy")
+            elif self.emotion_condition == 0 and self.people_emotion == 'angry':
+                self.movie = QMovie("./emotion/angry.gif")
+                self.movie.setScaledSize(QSize(200, 200))
+                self.image.setMovie(self.movie)
+                self.movie.start()
+                print("angry")
+            elif self.emotion_condition == 0 and self.people_emotion == 'surprise':
+                self.movie = QMovie("./emotion/surprise.gif")
+                self.movie.setScaledSize(QSize(200, 200))
+                self.image.setMovie(self.movie)
+                self.movie.start()
+                print("surprise")
+            elif self.emotion_condition == 0 and self.people_emotion == 'sad':
+                self.movie = QMovie("./emotion/sad.gif")
+                self.movie.setScaledSize(QSize(200, 200))
+                self.image.setMovie(self.movie)
+                self.movie.start()
+                print("sad")
+            elif self.emotion_condition == 0 and self.people_emotion == 'neutral':
+                self.movie = QMovie("./emotion/sad.gif")
+                self.movie.setScaledSize(QSize(200, 200))
+                self.image.setMovie(self.movie)
+                self.movie.start()
+                print("neutral")
 
-        if self.emotion_condition == 0 and emotioncondition == "happy":
-            # 随机选择装载在pet1里面的gif图进行展示，实现随机切换
-            self.movie = QMovie("./emotion/love.gif")
-            # 宠物大小
-            self.movie.setScaledSize(QSize(200, 200))
-            # 将动画添加到label中
-            self.image.setMovie(self.movie)
-            # 开始播放动画
-            self.movie.start()
-        elif self.emotion_condition == 0 and emotioncondition == "angry":
-            # 随机选择装载在pet1里面的gif图进行展示，实现随机切换
-            self.movie = QMovie("./emotion/angry.gif")
-            # 宠物大小
-            self.movie.setScaledSize(QSize(200, 200))
-            # 将动画添加到label中
-            self.image.setMovie(self.movie)
-            # 开始播放动画
-            self.movie.start()
-        elif self.emotion_condition == 0 and emotioncondition == "surprise":
-            # 随机选择装载在pet1里面的gif图进行展示，实现随机切换
-            self.movie = QMovie("./emotion/surprise.gif")
-            # 宠物大小
-            self.movie.setScaledSize(QSize(200, 200))
-            # 将动画添加到label中
-            self.image.setMovie(self.movie)
-            # 开始播放动画
-            self.movie.start()
-        elif self.emotion_condition == 0 and emotioncondition == "sad":
-            # 随机选择装载在pet1里面的gif图进行展示，实现随机切换
-            self.movie = QMovie(random.choice("./emotion/sad.gif"))
-            # 宠物大小
-            self.movie.setScaledSize(QSize(200, 200))
-            # 将动画添加到label中
-            self.image.setMovie(self.movie)
-            # 开始播放动画
-            self.movie.start()
 
 
     def walk(self):
+
         # 宠物能走的最大范围
-        if not self.walk_condition:
-            width, _ = QDesktopWidget().availableGeometry().width(), QDesktopWidget().availableGeometry().height()
-            # 定义步速和方向
-            self.speed = 10
-            if not hasattr(self, 'direction'):
-                self.direction = 1  # 表示宠物一开始要向右走，也可以赋值为-1让它一开始向左走
+        width, _ = QDesktopWidget().availableGeometry().width(), QDesktopWidget().availableGeometry().height()
+        # 定义步速和方向
+        self.speed = 10
+        # 获取当前的坐标
+        pos = self.pos()
+        x, y = pos.x(), pos.y()
+        # 根据方向往左或往右走
+        if x <= 0:
+            self.direction = 1
+        elif x >= width:
+            self.direction = -1
 
-            # 获取当前的坐标
+        # 根据方向播放不同的gif
+        if self.direction == -1:  # 向左
+            self.movie = QMovie("normal/left walk.gif")
+            self.movie.setScaledSize(QSize(200, 200))
+            self.image.setMovie(self.movie)
+            self.movie.start()
+        else:  # 向右
+            self.movie = QMovie("./normal/right walk.gif")
+            self.movie.setScaledSize(QSize(200, 200))
+            self.image.setMovie(self.movie)
+            self.movie.start()
+
+        if self.walk_condition == 0:
+            # 移动宠物
             pos = self.pos()
-            x, y = pos.x(), pos.y()
+            self.move(pos.x() + self.direction * self.speed, pos.y())
 
-            # 根据方向往左或往右走
-            if x <= 0:
-                self.direction = 1
-                # 选择向右走图片
-                self.movie = QMovie("./click/right walk.gif")
-                # 宠物大小
-                self.movie.setScaledSize(QSize(200, 200))
-                # 将动画添加到label中
-                self.image.setMovie(self.movie)
-                # 开始播放动画
-                self.movie.start()
-            elif x >= width:
-                self.direction = -1
-                self.move(x + self.direction * self.speed, y)
-                # 选择向左走图片
-                self.movie = QMovie("./click/left walk.gif")
-                # 宠物大小
-                self.movie.setScaledSize(QSize(200, 200))
-                # 将动画添加到label中
-                self.image.setMovie(self.movie)
-                # 开始播放动画
-                self.movie.start()
 
     # 退出操作，关闭程序
     def quit(self):
-        self.close()
-        sys.exit()
+        app.quit()
 
     # 显示宠物
     def showwin(self):
@@ -322,8 +254,6 @@ class DesktopPet(QWidget):
         self.talk_condition = 1
         # 即可调用对话状态改变
         self.talk()
-        # 即刻加载宠物点击动画
-        self.randomAct()
         if event.button() == Qt.LeftButton:
             self.is_follow_mouse = True
         # globalPos() 事件触发点相对于桌面的位置
@@ -359,7 +289,9 @@ class DesktopPet(QWidget):
         # 定义菜单项
         quitAction = menu.addAction("退出")
         hide = menu.addAction("隐藏")
+        nowalk = menu.addAction("不行走")
         walk = menu.addAction("行走")
+        noemotion = menu.addAction("没情感")
         emotion = menu.addAction("情感")
         # 使用exec_()方法显示菜单。从鼠标右键事件对象中获得当前坐标。mapToGlobal()方法把当前组件的相对坐标转换为窗口（window）的绝对坐标。
         action = menu.exec_(self.mapToGlobal(event.pos()))
@@ -370,20 +302,30 @@ class DesktopPet(QWidget):
         if action == hide:
             # 通过设置透明度方式隐藏宠物
             self.setWindowOpacity(0)
+        if action == nowalk:
+            self.walk_condition = 1
         if action == walk:
             self.walk_condition = 0
+        if action == noemotion:
+            self.emotion_condition = 1
         if action == emotion:
             self.emotion_condition = 0
 
 
+
 if __name__ == '__main__':
-    # 创建了一个QApplication对象，对象名为app，带两个参数argc,argv
-    # 所有的PyQt5应用必须创建一个应用（Application）对象。sys.argv参数是一个来自命令行的参数列表。
-    app = QApplication(sys.argv)
-    # 窗口组件初始化
-    pet = DesktopPet()
-    # 1. 进入时间循环；
-    # 2. wait，直到响应app可能的输入；
-    # 3. QT接收和处理用户及系统交代的事件（消息），并传递到各个窗口；
-    # 4. 程序遇到exit()退出时，机会返回exec()的值。
-    sys.exit(app.exec_())
+    face_detector, emotion_classifier, emotions, face_recognizer = facerecognize.facerecognize_begin()
+    try:
+        # 创建了一个QApplication对象，对象名为app，带两个参数argc,argv
+        # 所有的PyQt5应用必须创建一个应用（Application）对象。sys.argv参数是一个来自命令行的参数列表。
+        app = QApplication(sys.argv)
+        # 窗口组件初始化
+        pet = DesktopPet()
+        # 1. 进入时间循环；
+        # 2. wait，直到响应app可能的输入；
+        # 3. QT接收和处理用户及系统交代的事件（消息），并传递到各个窗口；
+        # 4. 程序遇到exit()退出时，机会返回exec()的值。
+        sys.exit(app.exec_())
+    except Exception as e:
+        print(e)
+
