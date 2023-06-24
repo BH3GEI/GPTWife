@@ -7,6 +7,9 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QMovie
 import facerecognize
 import pprint
+import weather
+from datetime import datetime
+
 
 class Detectemotion(QThread):
     change = pyqtSignal(str, int, int)
@@ -399,6 +402,75 @@ class DesktopPet(QWidget):
             self.emotion_condition = 0
 
 
+class Window(QWidget):
+
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+
+    # 初始化聊天框
+    def init_ui(self):
+        chat_btn = QPushButton("聊天", self)
+        chat_btn.clicked.connect(self.show_chat)
+        self.show()
+        # ...其他UI元素
+        self.chat_box = QDialog(self)
+        self.init_chat()
+
+    # 初始化聊天功能
+    def init_chat(self):
+        weather_btn = QPushButton("天气", self.chat_box)
+        weather_btn.move(20, 20)
+        weather_btn.clicked.connect(self.get_weather)
+
+        time_btn = QPushButton("时间", self.chat_box)
+        time_btn.move(20, 50)
+        time_btn.clicked.connect(self.get_time)
+
+        intro_btn = QPushButton("简介", self.chat_box)
+        intro_btn.move(20, 80)
+        intro_btn.clicked.connect(self.get_intro)
+
+    def show_chat(self):
+        self.chat_box.exec_()
+
+    # 查询天气按钮
+    def get_weather(self):
+        # 请用户输入城市名称
+        self.location = QInputDialog.getText(self, '输入城市', '请输入城市名称:')
+        print(self.location[0])
+        # 网络查询天气
+        try:
+            weather_result = weather.request_weather(self.location[0])
+            if weather_result['status'] == 200:
+                text = f"城市:{weather_result['cityInfo']['parent']} {weather_result['cityInfo']['city']}\n"
+                text += f"时间:{weather_result['time']} {weather_result['data']['forecast'][0]['week']}\n"
+                text += f"温度:{weather_result['data']['forecast'][0]['high']} {weather_result['data']['forecast'][0]['low']}\n"
+                text += f"天气:{weather_result['data']['forecast'][0]['type']}"
+            QMessageBox.information(self, "OK", text)
+        except:
+            print("这个城市找不到哦")
+
+    # 查询天气按钮
+    def get_time(self):
+        # 获取当前时间
+        currentDateAndTime = datetime.now()
+        text = str(currentDateAndTime)
+        QMessageBox.information(self, "时间", text)
+
+    # 简历
+    def get_intro(self):
+        text = f"这是一个电子宠物。\n"
+        text += f"有以下功能\n"
+        text += f"1、查询天气：输入地点点击ok。\n"
+        text += f"2、查询时间：点击时间\n"
+        text += f"3、行走：右键电子宠物点击行走即可切换是否沿屏幕行走。\n"
+        text += f"4、检测表情：右键电子宠物点击感情即可切换是否检测您的表情，当您难过或开心时会出现不同的话和大鹅动画。\n"
+        text += f"5、检测人物：这部分还没有做ui输入，现在您可以将面部照片放进faces文件夹。\n"
+        # 获取简介信息
+        QMessageBox.information(self, "简介", text)
+
+
 if __name__ == '__main__':
     face_detector, emotion_classifier, emotions, face_recognizer = facerecognize.facerecognize_begin()
     # try:
@@ -411,5 +483,7 @@ if __name__ == '__main__':
     # 2. wait，直到响应app可能的输入；
     # 3. QT接收和处理用户及系统交代的事件（消息），并传递到各个窗口；
     # 4. 程序遇到exit()退出时，机会返回exec()的值。
+    window = Window()
+    window.show()
     sys.exit(app.exec_())
     # except Exception as e:
