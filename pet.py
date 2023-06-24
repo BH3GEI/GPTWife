@@ -13,7 +13,6 @@ from datetime import datetime
 
 class Detectemotion(QThread):
     change = pyqtSignal(str, int, int)
-
     def run(self):
         while True:
             try:
@@ -29,11 +28,12 @@ class Detectemotion(QThread):
             self.msleep(10)
 
 
-class DesktopPet(QWidget):
+class DesktopPet(QWidget, QObject):
+
     def __init__(self, parent=None, **kwargs):
+
         # 加入检测人脸进程
         super().__init__()
-
         self.text = ""
         self.dialog = None
         # 识别到的人物序号
@@ -48,15 +48,11 @@ class DesktopPet(QWidget):
         self.condition = 0
         self.talk_condition = 0
         self.emotion_condition = 0
-
+        self.chat_condition = 1
         # 开始处理dialog.txt
         self.talkdialog()
         # 开始更新表情参数
         self.changeEmotion
-        # 打开检测表情线程
-        self.thread = Detectemotion()
-        self.thread.start()
-        self.thread.change.connect(self.changeEmotion)
 
         super(DesktopPet, self).__init__(parent)
         # 初始化窗口
@@ -87,6 +83,10 @@ class DesktopPet(QWidget):
         self.initPetImage()
         # 开启时钟
         self.pettimer()
+        # 打开检测表情线程
+        self.thread = Detectemotion()
+        self.thread.start()
+        self.thread.change.connect(self.changeEmotion)
 
 # 窗体初始化
     def init(self):
@@ -157,28 +157,33 @@ class DesktopPet(QWidget):
         self.count = 0
 
     def handleTimeout(self):
-        self.count += 1
-        # print(self.walk_condition)
-        if self.count % 8 == 0:  # 每0.8秒执行
-            # print("walk")
-            self.walk()
+        try:
+            self.count += 1
+            # print(self.walk_condition)
+            if self.count % 10 == 0:
+                self.chat_window()
 
-        if self.count % 100 == 0:  # 每10秒执行
-            if self.emotion_condition == 0:
-                # print("emotion")
-                self.emotion()
-                self.talk()
-                self.walk_control = 1
-                self.walk_condition = 1
+            if self.count % 8 == 0:  # 每0.8秒执行
+                # print("walk")
+                self.walk()
 
-        # 为了让emotion的gif完全播放
-        if self.count % 130 == 0:  # 每13秒执行
-            if self.walk_permit == 0:
-                self.walk_control = 0
-            self.walk_condition = 0
-            self.talk_clear()
-            self.count = 0
+            if self.count % 100 == 0:  # 每10秒执行
+                if self.emotion_condition == 0:
+                    # print("emotion")
+                    self.emotion()
+                    self.talk()
+                    self.walk_control = 1
+                    self.walk_condition = 1
 
+            # 为了让emotion的gif完全播放
+            if self.count % 130 == 0:  # 每13秒执行
+                if self.walk_permit == 0:
+                    self.walk_control = 0
+                self.walk_condition = 0
+                self.talk_clear()
+                self.count = 0
+        except Exception as e:
+            print(e)
 
     @pyqtSlot(str, int, int)
     def changeEmotion(self, people_emotion, people_label, people_emotion_number):
@@ -195,12 +200,12 @@ class DesktopPet(QWidget):
                 self.dialog_label = int(self.dialog_label.strip())
                 self.dialog_emotion_number = int(self.dialog_emotion_number.strip())
                 self.dialog.setdefault(self.dialog_emotion_number, {}).setdefault(self.dialog_label, []).append(self.dialog_text.strip())
-        pprint.pprint(self.dialog)
+        # pprint.pprint(self.dialog)
 
     # 清空说话
     def talk_clear(self):
         self.text = ""
-        print("cccc", self.text)
+        # print("cccc", self.text)
         self.talkLabel.setText(self.text)
         # 设置样式
         self.talkLabel.setStyleSheet(
@@ -217,7 +222,7 @@ class DesktopPet(QWidget):
     def talk(self):
         if not self.talk_condition:
             self.text = self.dialog[self.people_emotion_number][self.people_label][0]
-            print("cccc", self.text, self.people_emotion_number, self.people_label)
+            # print("cccc", self.text, self.people_emotion_number, self.people_label)
             self.talkLabel.setText(self.text)
             # 设置样式
             self.talkLabel.setStyleSheet(
@@ -246,7 +251,7 @@ class DesktopPet(QWidget):
     # 切换情感动画
     def emotion(self):
         # 动画切换表情
-        print("展示心情", self.people_emotion, self.people_emotion_number, self.people_label)
+        # print("展示心情", self.people_emotion, self.people_emotion_number, self.people_label)
         if self.emotion_condition == 0:
             if self.people_emotion == 'happy':
                 self.movie = QMovie("./emotion/love.gif")
@@ -317,6 +322,13 @@ class DesktopPet(QWidget):
                 self.image.setMovie(self.movie)
                 self.movie.start()
 
+    # chat
+    def chat_window(self):
+        if self.chat_condition == 0:
+            self.window = Window()
+            self.window.show()
+            self.chat_condition = 1
+
     # 退出操作，关闭程序
     def quit(self):
         app.quit()
@@ -379,10 +391,9 @@ class DesktopPet(QWidget):
         # 定义菜单项
         quitAction = menu.addAction("退出")
         hide = menu.addAction("隐藏")
-        nowalk = menu.addAction("不行走")
         walk = menu.addAction("行走")
-        noemotion = menu.addAction("没情感")
         emotion = menu.addAction("情感")
+        chat = menu.addAction("聊天")
         # 使用exec_()方法显示菜单。从鼠标右键事件对象中获得当前坐标。mapToGlobal()方法把当前组件的相对坐标转换为窗口（window）的绝对坐标。
         action = menu.exec_(self.mapToGlobal(event.pos()))
         # 点击事件为退出
@@ -392,18 +403,23 @@ class DesktopPet(QWidget):
         if action == hide:
             # 通过设置透明度方式隐藏宠物
             self.setWindowOpacity(0)
-        if action == nowalk:
-            self.walk_permit = 1
         if action == walk:
-            self.walk_permit = 0
-        if action == noemotion:
-            self.emotion_condition = 1
+            if self.walk_control == 0:
+                self.walk_control = 1
+            else:
+                self.walk_control = 0
         if action == emotion:
-            self.emotion_condition = 0
+            if self.emotion_condition == 0:
+                self.emotion_condition = 1
+            else:
+                self.emotion_condition = 0
+        # 点击事件为聊天
+        if action == chat:
+            # 打开聊天
+            self.chat_condition = 0
 
 
 class Window(QWidget):
-
     def __init__(self):
         super().__init__()
         self.init_ui()
@@ -411,8 +427,11 @@ class Window(QWidget):
     # 初始化聊天框
     def init_ui(self):
         chat_btn = QPushButton("聊天", self)
-        chat_btn.clicked.connect(self.show_chat)
-        self.show()
+        chat_btn.clicked.connect(self.show_chat_box)
+        chat_btn.move(20, 20)
+        hide_btn = QPushButton("不聊了", self)
+        hide_btn.clicked.connect(self.hide_window)
+        hide_btn.move(20, 50)
         # ...其他UI元素
         self.chat_box = QDialog(self)
         self.init_chat()
@@ -431,7 +450,7 @@ class Window(QWidget):
         intro_btn.move(20, 80)
         intro_btn.clicked.connect(self.get_intro)
 
-    def show_chat(self):
+    def show_chat_box(self, pet):
         self.chat_box.exec_()
 
     # 查询天气按钮
@@ -460,6 +479,11 @@ class Window(QWidget):
 
     # 简历
     def get_intro(self):
+        text = self.getMessageInfo()
+        # 获取简介信息
+        QMessageBox.information(self, "简介", text)
+
+    def getMessageInfo(self):
         text = f"这是一个电子宠物。\n"
         text += f"有以下功能\n"
         text += f"1、查询天气：输入地点点击ok。\n"
@@ -467,8 +491,17 @@ class Window(QWidget):
         text += f"3、行走：右键电子宠物点击行走即可切换是否沿屏幕行走。\n"
         text += f"4、检测表情：右键电子宠物点击感情即可切换是否检测您的表情，当您难过或开心时会出现不同的话和大鹅动画。\n"
         text += f"5、检测人物：这部分还没有做ui输入，现在您可以将面部照片放进faces文件夹。\n"
-        # 获取简介信息
-        QMessageBox.information(self, "简介", text)
+        text += f"如想关闭窗口，请在”聊天“”不聊了“界面，点击”不聊了“，不要点击×\n"
+        # 其他介绍信息
+        return text
+
+    def hide_window(self):
+        self.hide()  # 只隐藏窗口
+
+    def closeEvent(self, event):
+        # 只关闭聊天框窗口
+        self.chat_box.close()
+        event.ignore()
 
 
 if __name__ == '__main__':
@@ -479,11 +512,10 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     # 窗口组件初始化
     pet = DesktopPet()
+    pet.show()
     # 1. 进入时间循环；
     # 2. wait，直到响应app可能的输入；
     # 3. QT接收和处理用户及系统交代的事件（消息），并传递到各个窗口；
     # 4. 程序遇到exit()退出时，机会返回exec()的值。
-    window = Window()
-    window.show()
     sys.exit(app.exec_())
     # except Exception as e:
