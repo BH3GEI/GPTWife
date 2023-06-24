@@ -8,10 +8,30 @@ from PyQt5.QtGui import QMovie
 import facerecognize
 
 
+class Detectemotion(QThread):
+    change = pyqtSignal(str)
+
+    def run(self):
+        i = 0
+        while True:
+            people_emotion = facerecognize.faceReco(face_detector, emotion_classifier, emotions, face_recognizer)
+            self.change.emit(people_emotion)
+            print("心情也是", people_emotion)
+            # 每10秒emit一个值
+            self.msleep(10000)
+
+
 class DesktopPet(QWidget):
     def __init__(self, parent=None, **kwargs):
+        # 加入检测人脸进程
+        super().__init__()
+        self.thread = Detectemotion()
+        self.thread.start()
+        self.thread.change.connect(self.changeEmotion)
+
         super(DesktopPet, self).__init__(parent)
         # 窗体初始化
+        self.people_emotion = None
         self.movie = None
         self.image = None
         self.screen_width = QDesktopWidget().availableGeometry().width()
@@ -47,7 +67,6 @@ class DesktopPet(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         # 重绘组件、刷新
         self.repaint()
-
 
 # 托盘化设置初始化
     def initPall(self):
@@ -111,22 +130,29 @@ class DesktopPet(QWidget):
 
     def handleTimeout(self):
         self.count += 1
-        print(self.count)
-        if self.count % 13 == 0:  # 每0.3秒执行
-            print("walk")
+        # print(self.walk_condition)
+
+        if self.count % 8 == 0:  # 每0.8秒执行
+            # print("walk")
             self.walk()
 
-        if self.count % 13 == 0:  # 每0.4秒执行
-            print("talk")
+        if self.count % 8 == 0:  # 每0.8秒执行
+            # print("talk")
             self.talk()
 
-        if self.count % 40 == 0:  # 每0.5秒执行
-            print("emotion")
+        if self.count % 100 == 0:  # 每10秒执行
+            # print("emotion")
             self.emotion()
+            self.walk_condition = 1
 
-        if self.count % 51 == 0:  # 每0.5秒执行
-            print("delay")
+        # 为了让emotion的gif完全播放
+        if self.count % 120 == 0:  # 每12秒执行
+            self.walk_condition = 0
             self.count = 0
+
+    @pyqtSlot(str)
+    def changeEmotion(self, people_emotion):
+        self.people_emotion = people_emotion
 
     # 宠物对话框行为处理
     def talk(self):
@@ -158,9 +184,27 @@ class DesktopPet(QWidget):
             self.talk_condition = 0
 
     def emotion(self):
+        # 同时走路
+        # 宠物能走的最大范围
+        width, _ = QDesktopWidget().availableGeometry().width(), QDesktopWidget().availableGeometry().height()
+        # 定义步速和方向
+        self.speed = 10
+        # 获取当前的坐标
+        pos = self.pos()
+        x, y = pos.x(), pos.y()
+        # 根据方向往左或往右走
+        if x <= 0:
+            self.direction = 1
+        elif x >= width:
+            self.direction = -1
+
+        if self.walk_condition == 0:
+            # 移动宠物
+            pos = self.pos()
+            self.move(pos.x() + self.direction * self.speed, pos.y())
+
+        # 动画切换表情
         if self.emotion_condition == 0:
-            self.people_emotion = facerecognize.faceReco(face_detector, emotion_classifier, emotions, face_recognizer)
-            print(self.people_emotion)
             if self.emotion_condition == 0 and self.people_emotion == 'happy':
                 self.movie = QMovie("./emotion/love.gif")
                 self.movie.setScaledSize(QSize(200, 200))
@@ -190,12 +234,8 @@ class DesktopPet(QWidget):
                 self.movie.setScaledSize(QSize(200, 200))
                 self.image.setMovie(self.movie)
                 self.movie.start()
-                print("neutral")
-
-
 
     def walk(self):
-
         # 宠物能走的最大范围
         width, _ = QDesktopWidget().availableGeometry().width(), QDesktopWidget().availableGeometry().height()
         # 定义步速和方向
@@ -209,23 +249,21 @@ class DesktopPet(QWidget):
         elif x >= width:
             self.direction = -1
 
-        # 根据方向播放不同的gif
-        if self.direction == -1:  # 向左
-            self.movie = QMovie("normal/left walk.gif")
-            self.movie.setScaledSize(QSize(200, 200))
-            self.image.setMovie(self.movie)
-            self.movie.start()
-        else:  # 向右
-            self.movie = QMovie("./normal/right walk.gif")
-            self.movie.setScaledSize(QSize(200, 200))
-            self.image.setMovie(self.movie)
-            self.movie.start()
-
         if self.walk_condition == 0:
             # 移动宠物
             pos = self.pos()
             self.move(pos.x() + self.direction * self.speed, pos.y())
-
+            # 根据方向播放不同的gif
+            if self.direction == -1:  # 向左
+                self.movie = QMovie("normal/left walk.gif")
+                self.movie.setScaledSize(QSize(200, 200))
+                self.image.setMovie(self.movie)
+                self.movie.start()
+            else:  # 向右
+                self.movie = QMovie("./normal/right walk.gif")
+                self.movie.setScaledSize(QSize(200, 200))
+                self.image.setMovie(self.movie)
+                self.movie.start()
 
     # 退出操作，关闭程序
     def quit(self):
@@ -312,7 +350,6 @@ class DesktopPet(QWidget):
             self.emotion_condition = 0
 
 
-
 if __name__ == '__main__':
     face_detector, emotion_classifier, emotions, face_recognizer = facerecognize.facerecognize_begin()
     try:
@@ -328,4 +365,3 @@ if __name__ == '__main__':
         sys.exit(app.exec_())
     except Exception as e:
         print(e)
-
