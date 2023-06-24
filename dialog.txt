@@ -1,4 +1,15 @@
-啊吧啊吧啊吧啊吧啊吧啊吧
-哭哭哭哭哭哭哭哭
-啊啊啊啊啊啊
-啊啊啊啊啊啊啊
+happy 0 0 你好呀!陌生人
+happy 0 1 你好呀!nana
+happy 0 2 你看起来心情很愉快哦，bro
+neutral 2 0 滴呖呖滴沥沥，陌生人
+neutral 2 1 滴呖呖滴沥沥，nana
+neutral 2 2 滴呖呖滴沥沥，bro
+angry 3 0 为什么要生气呀?陌生人
+angry 3 1 为什么要生气呀?nana
+angry 3 2 别生气了,跟我说说吧，bro
+sad 4 0 摸摸头，陌生人
+sad 4 1 摸摸头，nana
+sad 4 2 摸摸狗头，bro
+surprise 5 0 哇哦哦，陌生人
+surprise 5 1 哇哦哦，nana
+surprise 5 2 哇哦哦哇哦哦，bro

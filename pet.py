@@ -6,52 +6,84 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QMovie
 import facerecognize
-
+import pprint
 
 class Detectemotion(QThread):
-    change = pyqtSignal(str)
+    change = pyqtSignal(str, int, int)
 
     def run(self):
-        i = 0
         while True:
-            people_emotion = facerecognize.faceReco(face_detector, emotion_classifier, emotions, face_recognizer)
-            self.change.emit(people_emotion)
-            print("心情也是", people_emotion)
+            try:
+                people_emotion, people_label, people_emotion_number = facerecognize.faceReco(face_detector, emotion_classifier, emotions, face_recognizer)
+            except:
+                people_label = 0
+                people_emotion = "neutral"
+                people_emotion_number = 2
+            # print("aaaa", people_label)
+            # print("bbbb", people_emotion_number)
+            self.change.emit(people_emotion, people_label, people_emotion_number)
             # 每10秒emit一个值
-            self.msleep(10000)
+            self.msleep(10)
 
 
 class DesktopPet(QWidget):
     def __init__(self, parent=None, **kwargs):
         # 加入检测人脸进程
         super().__init__()
+
+        self.text = ""
+        self.dialog = None
+        # 识别到的人物序号
+        self.people_label = 1
+        # self.walk_permit 0可以走路 1 不再走路
+        self.walk_permit = 0
+        # self.walk_control 0可以位移 1 不再位移
+        self.walk_control = 0
+        # self.walk_condition 0可以更换左右走动画 1不更换动画
+        self.walk_condition = 0
+        # 初始化状态
+        self.condition = 0
+        self.talk_condition = 0
+        self.emotion_condition = 0
+
+        # 开始处理dialog.txt
+        self.talkdialog()
+        # 开始更新表情参数
+        self.changeEmotion
+        # 打开检测表情线程
         self.thread = Detectemotion()
         self.thread.start()
         self.thread.change.connect(self.changeEmotion)
 
         super(DesktopPet, self).__init__(parent)
-        # 窗体初始化
-        self.people_emotion = None
+        # 初始化窗口
         self.movie = None
         self.image = None
         self.screen_width = QDesktopWidget().availableGeometry().width()
         self.screen_height = QDesktopWidget().availableGeometry().height()
+        # 初始化表情
+        self.people_emotion = "neutral"
+        self.people_label = 0
+        # 情绪序号 emotions = ['happy', 'disgust', 'neutral', 'angry', 'sad', 'surprise', 'fear']
+        self.people_emotion_number = 2
+        # 初始化计时器
         self.count = 0
+        # 初始化鼠标点击状态、初始位置
         self.mouse_pressed = False
         self.origin_pos = self.pos()
-        self.condition = 0
-        self.walk_condition = 0
-        self.talk_condition = 0
-        self.emotion_condition = 0
+        # 初始化运动方向 1向右 0向左
         self.direction = 1
+        # 初始化开启动画
+        self.walk_movie = QMovie("emotion/love.gif")
+        self.emotion_movie = QMovie("emotion/love.gif")
+        # 初始化开始
         self.init()
         # 托盘化初始
         self.initPall()
         # 宠物静态gif图加载
         self.initPetImage()
+        # 开启时钟
         self.pettimer()
-        self.walk_movie = QMovie("emotion/love.gif")
-        self.emotion_movie = QMovie("emotion/love.gif")
 
 # 窗体初始化
     def init(self):
@@ -114,13 +146,6 @@ class DesktopPet(QWidget):
         self.randomPosition()
         # 展示
         self.show()
-        # 将宠物正常待机状态的对话放入pet2中
-        self.dialog = []
-        # 读取目录下dialog文件
-        with open("dialog.txt", "r", encoding="GB2312") as f:
-            text = f.read()
-            # 以\n 即换行符为分隔符，分割放进dialog中
-            self.dialog = text.split("\n")
 
     def pettimer(self):
         self.timer = QTimer()
@@ -131,110 +156,132 @@ class DesktopPet(QWidget):
     def handleTimeout(self):
         self.count += 1
         # print(self.walk_condition)
-
         if self.count % 8 == 0:  # 每0.8秒执行
             # print("walk")
             self.walk()
 
-        if self.count % 8 == 0:  # 每0.8秒执行
-            # print("talk")
-            self.talk()
-
         if self.count % 100 == 0:  # 每10秒执行
-            # print("emotion")
-            self.emotion()
-            self.walk_condition = 1
+            if self.emotion_condition == 0:
+                # print("emotion")
+                self.emotion()
+                self.talk()
+                self.walk_control = 1
+                self.walk_condition = 1
 
         # 为了让emotion的gif完全播放
-        if self.count % 120 == 0:  # 每12秒执行
+        if self.count % 130 == 0:  # 每13秒执行
+            if self.walk_permit == 0:
+                self.walk_control = 0
             self.walk_condition = 0
+            self.talk_clear()
             self.count = 0
 
-    @pyqtSlot(str)
-    def changeEmotion(self, people_emotion):
+
+    @pyqtSlot(str, int, int)
+    def changeEmotion(self, people_emotion, people_label, people_emotion_number):
         self.people_emotion = people_emotion
+        self.people_label = people_label
+        self.people_emotion_number = people_emotion_number
+
+    # 把dialog.txt存入self.dialog
+    def talkdialog(self):
+        self.dialog = {}
+        with open('dialog.txt', encoding='gb2312') as f:
+            for line in f:
+                self.dialog_emotion, self.dialog_emotion_number, self.dialog_label, self.dialog_text = line.split()
+                self.dialog_label = int(self.dialog_label.strip())
+                self.dialog_emotion_number = int(self.dialog_emotion_number.strip())
+                self.dialog.setdefault(self.dialog_emotion_number, {}).setdefault(self.dialog_label, []).append(self.dialog_text.strip())
+        pprint.pprint(self.dialog)
+
+    # 清空说话
+    def talk_clear(self):
+        self.text = ""
+        print("cccc", self.text)
+        self.talkLabel.setText(self.text)
+        # 设置样式
+        self.talkLabel.setStyleSheet(
+            "font: bold;"
+            "font:20pt '楷体';"
+            "color:black;"
+            "background-color: black"
+            "url(:/)"
+        )
+        # 根据内容自适应大小
+        self.talkLabel.adjustSize()
 
     # 宠物对话框行为处理
     def talk(self):
         if not self.talk_condition:
-            # talk_condition为0则选取加载在dialog中的语句
-            self.talkLabel.setText(random.choice(self.dialog))
+            self.text = self.dialog[self.people_emotion_number][self.people_label][0]
+            print("cccc", self.text, self.people_emotion_number, self.people_label)
+            self.talkLabel.setText(self.text)
             # 设置样式
             self.talkLabel.setStyleSheet(
                 "font: bold;"
-                "font:25pt '楷体';"
-                "color:white;"
-                "background-color: white"
+                "font:20pt '楷体';"
+                "color:black;"
+                "background-color: black"
                 "url(:/)"
             )
             # 根据内容自适应大小
             self.talkLabel.adjustSize()
         else:
             # talk_condition为1显示为别点我，这里同样可以通过if-else-if来拓展对应的行为
-            self.talkLabel.setText("别点我")
+            self.talkLabel.setText("呜呼呜呼")
             self.talkLabel.setStyleSheet(
                 "font: bold;"
-                "font:25pt '楷体';"
-                "color:white;"
-                "background-color: white"
+                "font:20pt '楷体';"
+                "color:black;"
+                "background-color: black"
                 "url(:/)"
             )
             self.talkLabel.adjustSize()
             # 设置为正常状态
             self.talk_condition = 0
 
+    # 切换情感动画
     def emotion(self):
-        # 同时走路
-        # 宠物能走的最大范围
-        width, _ = QDesktopWidget().availableGeometry().width(), QDesktopWidget().availableGeometry().height()
-        # 定义步速和方向
-        self.speed = 10
-        # 获取当前的坐标
-        pos = self.pos()
-        x, y = pos.x(), pos.y()
-        # 根据方向往左或往右走
-        if x <= 0:
-            self.direction = 1
-        elif x >= width:
-            self.direction = -1
-
-        if self.walk_condition == 0:
-            # 移动宠物
-            pos = self.pos()
-            self.move(pos.x() + self.direction * self.speed, pos.y())
-
         # 动画切换表情
+        print("展示心情", self.people_emotion, self.people_emotion_number, self.people_label)
         if self.emotion_condition == 0:
-            if self.emotion_condition == 0 and self.people_emotion == 'happy':
+            if self.people_emotion == 'happy':
                 self.movie = QMovie("./emotion/love.gif")
                 self.movie.setScaledSize(QSize(200, 200))
                 self.image.setMovie(self.movie)
                 self.movie.start()
-                print("happy")
-            elif self.emotion_condition == 0 and self.people_emotion == 'angry':
+                # print("happy")
+            elif self.people_emotion == 'angry':
                 self.movie = QMovie("./emotion/angry.gif")
                 self.movie.setScaledSize(QSize(200, 200))
                 self.image.setMovie(self.movie)
                 self.movie.start()
-                print("angry")
-            elif self.emotion_condition == 0 and self.people_emotion == 'surprise':
+                # print("angry")
+            elif self.people_emotion == 'surprise':
                 self.movie = QMovie("./emotion/surprise.gif")
                 self.movie.setScaledSize(QSize(200, 200))
                 self.image.setMovie(self.movie)
                 self.movie.start()
-                print("surprise")
-            elif self.emotion_condition == 0 and self.people_emotion == 'sad':
+                # print("surprise")
+            elif self.people_emotion == 'sad':
                 self.movie = QMovie("./emotion/sad.gif")
                 self.movie.setScaledSize(QSize(200, 200))
                 self.image.setMovie(self.movie)
                 self.movie.start()
-                print("sad")
-            elif self.emotion_condition == 0 and self.people_emotion == 'neutral':
-                self.movie = QMovie("./emotion/sad.gif")
-                self.movie.setScaledSize(QSize(200, 200))
-                self.image.setMovie(self.movie)
-                self.movie.start()
+                # print("sad")
+            elif self.people_emotion == 'neutral':
+                if self.direction == -1:  # 向左
+                    self.movie = QMovie("normal/left walk.gif")
+                    self.movie.setScaledSize(QSize(200, 200))
+                    self.image.setMovie(self.movie)
+                    self.movie.start()
+                else:  # 向右
+                    self.movie = QMovie("./normal/right walk.gif")
+                    self.movie.setScaledSize(QSize(200, 200))
+                    self.image.setMovie(self.movie)
+                    self.movie.start()
 
+    # 位移和切换方向动画
     def walk(self):
         # 宠物能走的最大范围
         width, _ = QDesktopWidget().availableGeometry().width(), QDesktopWidget().availableGeometry().height()
@@ -249,10 +296,12 @@ class DesktopPet(QWidget):
         elif x >= width:
             self.direction = -1
 
-        if self.walk_condition == 0:
+        if self.walk_control == 0 and self.walk_permit != 1:
             # 移动宠物
             pos = self.pos()
             self.move(pos.x() + self.direction * self.speed, pos.y())
+
+        if self.walk_condition == 0:
             # 根据方向播放不同的gif
             if self.direction == -1:  # 向左
                 self.movie = QMovie("normal/left walk.gif")
@@ -341,9 +390,9 @@ class DesktopPet(QWidget):
             # 通过设置透明度方式隐藏宠物
             self.setWindowOpacity(0)
         if action == nowalk:
-            self.walk_condition = 1
+            self.walk_permit = 1
         if action == walk:
-            self.walk_condition = 0
+            self.walk_permit = 0
         if action == noemotion:
             self.emotion_condition = 1
         if action == emotion:
@@ -352,16 +401,15 @@ class DesktopPet(QWidget):
 
 if __name__ == '__main__':
     face_detector, emotion_classifier, emotions, face_recognizer = facerecognize.facerecognize_begin()
-    try:
-        # 创建了一个QApplication对象，对象名为app，带两个参数argc,argv
-        # 所有的PyQt5应用必须创建一个应用（Application）对象。sys.argv参数是一个来自命令行的参数列表。
-        app = QApplication(sys.argv)
-        # 窗口组件初始化
-        pet = DesktopPet()
-        # 1. 进入时间循环；
-        # 2. wait，直到响应app可能的输入；
-        # 3. QT接收和处理用户及系统交代的事件（消息），并传递到各个窗口；
-        # 4. 程序遇到exit()退出时，机会返回exec()的值。
-        sys.exit(app.exec_())
-    except Exception as e:
-        print(e)
+    # try:
+    # 创建了一个QApplication对象，对象名为app，带两个参数argc,argv
+    # 所有的PyQt5应用必须创建一个应用（Application）对象。sys.argv参数是一个来自命令行的参数列表。
+    app = QApplication(sys.argv)
+    # 窗口组件初始化
+    pet = DesktopPet()
+    # 1. 进入时间循环；
+    # 2. wait，直到响应app可能的输入；
+    # 3. QT接收和处理用户及系统交代的事件（消息），并传递到各个窗口；
+    # 4. 程序遇到exit()退出时，机会返回exec()的值。
+    sys.exit(app.exec_())
+    # except Exception as e:

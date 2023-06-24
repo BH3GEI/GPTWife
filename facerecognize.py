@@ -5,6 +5,7 @@ from keras.models import load_model
 from tensorflow.keras.utils import img_to_array
 
 
+
 def facerecognize_begin():
     # 创建一个人脸检测器对象
     face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -69,6 +70,8 @@ def facerecognize_begin():
 
 
 def faceReco(face_detector, emotion_classifier, emotions, face_recognizer):
+    label = 0
+    emotion_number = 2
     cap = cv2.VideoCapture(0)
     ret, frame = cap.read()
     # 转换为灰度图像
@@ -80,7 +83,6 @@ def faceReco(face_detector, emotion_classifier, emotions, face_recognizer):
     for (x, y, w, h) in faces:
         # 裁剪出人脸区域
         face = gray[y:y + h, x:x + w]
-
         # 调整图像大小以匹配表情模型的输入大小
         resized_image = cv2.resize(face, (48, 48))
         # 将图像转换为表情模型所需的数组格式
@@ -88,10 +90,12 @@ def faceReco(face_detector, emotion_classifier, emotions, face_recognizer):
         image_array = np.expand_dims(image_array, axis=0)
         # 使用模型进行表情预测
         predictions = emotion_classifier.predict(image_array)
-        # print(predictions)
         emotion = emotions[np.argmax(predictions)]
-        print("表情：", emotion)
+        emotion_number = np.argmax(predictions)
+        # print("表情：", emotion)
         # 预测人脸的标签
-        label, confidence = face_recognizer.predict(face)
-        print("身份：", label, confidence)
-    return emotion
+        # 如果检测到人脸,则预测人脸标签
+        if w > 0 and h > 0:
+            label, confidence = face_recognizer.predict(face)
+        # print("身份：", label, confidence, emotion_number)
+    return emotion, label, emotion_number
